@@ -1,6 +1,6 @@
 {
   "name": "strong-fetch",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:ImnotLiAng"
+    "url": "https://github.com/ImnotLiAng/strong-fetch.git"
   },
   "type": "module",
   "author": "linzibin",
