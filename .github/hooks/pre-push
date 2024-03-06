@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# 获取当前版本号
+CURRENT_VERSION=$(grep '"version":' package.json | awk -F '"' '{print $4}')
+
+# 通过 git diff 检查是否有未暂存的更改
+if [[ -n $(git diff --exit-code) ]]; then
+  echo "There are unstaged changes. Aborting pre-push hook."
+  exit 1
+fi
+
+# 通过 git diff --cached 检查是否有未提交的更改
+if [[ -n $(git diff --cached --exit-code) ]]; then
+  echo "There are staged but uncommitted changes. Aborting pre-push hook."
+  exit 1
+fi
+
+# 获取最新的版本号
+NEW_VERSION=$(grep '"version":' package.json | awk -F '"' '{print $4}')
+
+# 如果版本号没有变化，则自动运行 npm version patch
+if [[ "$CURRENT_VERSION" == "$NEW_VERSION" ]]; then
+  echo "No version change detected. Automatically bumping patch version..."
+  npm version patch
+fi
+
+exit 0
