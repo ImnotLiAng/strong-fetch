@@ -2,12 +2,14 @@
   "name": "strong-fetch",
   "version": "1.0.7",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
-    "index.js"
+    "dist"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublish": "tsc"
   },
   "repository": {
     "type": "git",
@@ -15,5 +17,10 @@
   },
   "type": "module",
   "author": "linzibin",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "abort-controller": "^3.0.0",
+    "node-fetch": "^3.3.2",
+    "https-proxy-agent": "^7.0.2"
+  }
 }

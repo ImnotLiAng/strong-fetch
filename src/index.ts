@@ -1,5 +1,5 @@
-import fetch, { AbortError, Headers } from "node-fetch";
-import AbortController from "abort-controller";
+import fetch, { AbortError, Headers, RequestInit, RequestInfo } from "node-fetch";
+import { AbortController } from "abort-controller";
 import { HttpsProxyAgent } from "https-proxy-agent";
 
 /**
@@ -8,16 +8,15 @@ import { HttpsProxyAgent } from "https-proxy-agent";
  * @param {*} args
  * @return {*} Promise
  */
-const fetchWithTimeout = async (...args) => {
+const fetchWithTimeout = async (url: URL | RequestInfo, init?: RequestInit & { timeout?: number }) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
-  }, args[1]?.timeout || 5000);
-  const newArgs = args;
+  }, init?.timeout || 5000);
   const signal = controller.signal;
-  newArgs[1] = args[1] ? { ...args[1], signal } : { signal };
+  const newInit = init ? { ...init, signal } : { signal };
   try {
-    const res = await fetch(...newArgs);
+    const res = await fetch(url, newInit);
     return res;
   } catch (err) {
     if (err instanceof AbortError) {
@@ -25,7 +24,7 @@ const fetchWithTimeout = async (...args) => {
     }
     return Promise.reject(err);
   } finally {
-    clearImmediate(timeout);
+    clearTimeout(timeout);
   }
 };
 /**
@@ -37,7 +36,7 @@ const fetchWithTimeout = async (...args) => {
  * @param {number} [interval=5]
  * @return {*} Promise
  */
-const fetchWithRetry = async (fun, interval = 5) => {
+const fetchWithRetry = async <Res>(fun: (args?: any[]) => Promise<Res>, interval = 5): Promise<Res> => {
   try {
     const res = await fun();
     return res;
@@ -54,12 +53,11 @@ const fetchWithRetry = async (fun, interval = 5) => {
  * @param {*} { origin, key, value }
  * @return {*} 
  */
-function addHeader({ origin, key, value }) {
-  const args = origin;
-  const newHeaders = new Headers(args[1]?.headers);
+function addHeader({ init, key, value }: { init?:  RequestInit & { timeout?: number }, key: string, value: any }): RequestInit & { timeout?: number } {
+  const newHeaders = new Headers(init?.headers);
   newHeaders.set(key, value);
-  args[1] = args[1] ? { ...args[1], headers: newHeaders } : { headers: newHeaders };
-  return args;
+  init = init ? { ...init, headers: newHeaders } : { headers: newHeaders };
+  return init;
 }
 /**
  * @description: call when a api needs JWT Auth;
@@ -68,20 +66,20 @@ function addHeader({ origin, key, value }) {
  * @param {*} fun
  * @return {*} function that used to fetch data
  */
-const fetchWithAuth = (fun) => {
+const fetchWithAuth = (fun: (args?: any[]) => Promise<any>) => {
   let Authorization = "";
-  let promise;
+  let promise: null | undefined | Promise<any>;
   async function update() {
     if (promise) return promise;
     promise = fetchWithRetry(fun);
     Authorization = await promise;
     promise = null;
   }
-  return async function _(...args) {
-    const res = await fetchWithTimeout(...addHeader({ origin: args, key: "Authorization", value: Authorization }));
+  return async function _(url: URL | RequestInfo, init?: RequestInit & { timeout?: number }) {
+    const res = await fetchWithTimeout(url, addHeader({ init, key: "Authorization", value: Authorization }));
     if ([401, 403].includes(res.status)) {
       await update();
-      return fetchWithTimeout(...addHeader({ origin: args, key: "Authorization", value: Authorization }));
+      return fetchWithTimeout(url, addHeader({ init, key: "Authorization", value: Authorization }));
     }
     return res;
   };
@@ -92,12 +90,11 @@ const fetchWithAuth = (fun) => {
  * @param {*} args
  * @return {*} Promise
  */
-const fetchByProxy = async (...args) => {
-  const proxyUrl = args[1].proxyUrl;
+const fetchByProxy = async (url: URL | RequestInfo, init: RequestInit & { timeout?: number, proxyUrl: string }) => {
+  const proxyUrl = init.proxyUrl;
   const agent = new HttpsProxyAgent(proxyUrl);
-  const newArgs = args;
-  newArgs[1] = args[1] ? { ...args[1], agent } : { agent };
-  const res = await fetchWithTimeout(...newArgs);
+  init.agent = agent;
+  const res = await fetchWithTimeout(url, init);
   return res;
 };
 /**
@@ -108,9 +105,9 @@ const fetchByProxy = async (...args) => {
  * @param {number} [interval=60 * 5]
  * @return {*} function that get data
  */
-const fixedRefresh = (fun, interval = 60 * 5) => {
-  let res;
-  let promise;
+const fixedRefresh = <Res>(fun: (args?: any[]) => Promise<Res>, interval = 60 * 5): () => Promise<Res | undefined> => {
+  let res: Res | undefined;
+  let promise: undefined | null | Promise<any>;
   let lastUpdateTimestamp = 0;
   async function update() {
     if (promise) return promise;
